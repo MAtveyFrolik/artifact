@@ -750,34 +750,53 @@ function saveData(data) {
             document.body.appendChild(script);
         }
 
-       async function syncNow() {
+       function syncNow() {
             if (!googleScriptUrl) {
                 alert('Сначала подключитесь в разделе "Синхронизация"');
                 return;
             }
-            try {
-                document.getElementById('syncStatusText').textContent = '⏳ Синхронизация...';
-                const data = { products, suppliers };
-                
-                const formData = new FormData();
-                formData.append('data', JSON.stringify(data));
-        
-                // Используем no-cors, чтобы обойти блокировку браузера
-                await fetch(googleScriptUrl, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: formData
-                });
-        
-                document.getElementById('syncStatusText').textContent = '✅ Синхронизировано';
-                document.getElementById('syncStatus').textContent = '✅ Синхронизировано';
-                alert('✅ Данные отправлены в Google Таблицу!');
-                
-            } catch (e) {
-                alert('❌ Ошибка сети: ' + e.message);
-                document.getElementById('syncStatusText').textContent = '❌ Ошибка';
-            }
+            document.getElementById('syncStatusText').textContent = '⏳ Синхронизация...';
+            const callbackName = 'syncPullCallback_' + Date.now();
+            window[callbackName] = function(response) {
+                try {
+                    if (response.status === 'ok') {
+                        const googleProducts = response.products || [];
+                        const googleSuppliers = response.suppliers || [];
+                        const googleProductIds = new Set(googleProducts.map(p => String(p.id)));
+                        const googleSupplierIds = new Set(googleSuppliers.map(s => String(s.id)));
+                        const myNewProducts = products.filter(p => !googleProductIds.has(String(p.id)));
+                        const myNewSuppliers = suppliers.filter(s => !googleSupplierIds.has(String(s.id)));
+                        products = [...googleProducts, ...myNewProducts];
+                        suppliers = [...googleSuppliers, ...myNewSuppliers];
+                        localStorage.setItem('products', JSON.stringify(products));
+                        localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                        renderAll();
+                        // Отправляем объединённые данные в Google
+                        const data = { products, suppliers };
+                        const formData = new FormData();
+                        formData.append('data', JSON.stringify(data));
+                        if (navigator.sendBeacon) {
+                            navigator.sendBeacon(googleScriptUrl, formData);
+                        } else {
+                            fetch(googleScriptUrl, { method: 'POST', mode: 'no-cors', body: formData }).catch(()=>{});
+                        }
+                        document.getElementById('syncStatusText').textContent = '✅ Синхронизировано';
+                        document.getElementById('syncStatus').textContent = '✅ Синхронизировано';
+                        alert('✅ Синхронизация завершена!');
+                    } else {
+                        alert('❌ Ошибка от Google: ' + response.message);
+                    }
+                } catch (e) {
+                    alert('❌ Ошибка: ' + e.message);
+                }
+                if (script.parentNode) document.body.removeChild(script);
+                delete window[callbackName];
+            };
+            const script = document.createElement('script');
+            script.src = googleScriptUrl + '?action=getData&callback=' + callbackName;
+            document.body.appendChild(script);
         }
+        
    async function autoSync() {
         if (googleScriptUrl && navigator.onLine) {
             try {
@@ -829,8 +848,7 @@ function saveData(data) {
             
             if (googleScriptUrl) {
                 document.getElementById('syncStatus').textContent = '✅ Подключено';
-                // Запускаем загрузку данных из Google при старте
-                loadDataFromGoogle();
+                // НЕ вызываем loadDataFromGoogle автоматически, чтобы не затирать локальные данные
             }
             
             renderAll();
