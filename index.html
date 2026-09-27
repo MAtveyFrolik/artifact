@@ -804,20 +804,87 @@ function saveData(data) {
             document.body.appendChild(script);
         }
         
-   async function autoSync() {
-        if (googleScriptUrl && navigator.onLine) {
-            try {
-                const data = { products, suppliers };
-                const formData = new FormData();
-                formData.append('data', JSON.stringify(data));
+   function autoSync() {
+        pushToGoogle(); // Отправляем сразу при любом сохранении
+    }
+
+
+        // ⬇️ Скачать из Google и объединить с локальными данными
+    function pullMergeFromGoogle(silent) {
+        if (!googleScriptUrl) return;
+        
+        const callbackName = 'pullMerge_' + Date.now();
+        window[callbackName] = function(response) {
+            if (response.status === 'ok') {
+                const googleProducts = response.products || [];
+                const googleSuppliers = response.suppliers || [];
                 
-                await fetch(googleScriptUrl, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: formData
-                }).catch(() => {});
-            } catch (e) {}
+                const gpIds = new Set(googleProducts.map(p => String(p.id)));
+                const gsIds = new Set(googleSuppliers.map(s => String(s.id)));
+                
+                const myNewProducts = products.filter(p => !gpIds.has(String(p.id)));
+                const myNewSuppliers = suppliers.filter(s => !gsIds.has(String(s.id)));
+                
+                const merged = {
+                    products: [...googleProducts, ...myNewProducts],
+                    suppliers: [...googleSuppliers, ...myNewSuppliers]
+                };
+                
+                // Проверяем, изменилось ли что-то
+                const changed = JSON.stringify(merged.products) !== JSON.stringify(products) ||
+                                JSON.stringify(merged.suppliers) !== JSON.stringify(suppliers);
+                
+                products = merged.products;
+                suppliers = merged.suppliers;
+                localStorage.setItem('products', JSON.stringify(products));
+                localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                
+                if (changed) {
+                    renderAll();
+                    console.log('🔄 Данные обновлены из Google');
+                }
+                
+                // Если у нас есть новые данные (которых нет в Google) — отправляем их
+                if (myNewProducts.length > 0 || myNewSuppliers.length > 0) {
+                    pushToGoogle();
+                }
+            }
+            if (script.parentNode) document.body.removeChild(script);
+            delete window[callbackName];
+        };
+        
+        const script = document.createElement('script');
+        script.src = googleScriptUrl + '?action=getData&callback=' + callbackName;
+        document.body.appendChild(script);
+    }
+    
+    // ⬆️ Отправить в Google (без ожидания ответа)
+    function pushToGoogle() {
+        if (!googleScriptUrl || !navigator.onLine) return;
+        
+        const data = { products, suppliers };
+        const formData = new FormData();
+        formData.append('data', JSON.stringify(data));
+        
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon(googleScriptUrl, formData);
+        } else {
+            fetch(googleScriptUrl, { method: 'POST', mode: 'no-cors', body: formData }).catch(()=>{});
         }
+        console.log('⬆️ Отправлено в Google');
+    }
+    
+    // 🔄 Автосинхронизация каждые 30 секунд
+    let autoSyncTimer = null;
+    
+    function startAutoSync() {
+        if (autoSyncTimer) clearInterval(autoSyncTimer);
+        autoSyncTimer = setInterval(() => {
+            if (document.visibilityState === 'visible' && navigator.onLine && googleScriptUrl) {
+                pullMergeFromGoogle(true); // тихо, без алертов
+            }
+        }, 30000); // каждые 30 секунд
+        console.log('🔄 Автосинхронизация запущена (30 сек)');
     }
 
         function pullFromGoogle() {
@@ -896,11 +963,28 @@ function saveData(data) {
             
             if (googleScriptUrl) {
                 document.getElementById('syncStatus').textContent = '✅ Подключено';
-                // НЕ вызываем loadDataFromGoogle автоматически, чтобы не затирать локальные данные
+                // Сразу скачиваем свежие данные
+                pullMergeFromGoogle(true);
+                // И запускаем периодический опрос
+                startAutoSync();
             }
             
             renderAll();
         }
+
+        // Дослать данные перед закрытием/сворачиванием вкладки
+        window.addEventListener('beforeunload', () => {
+            if (googleScriptUrl) pushToGoogle();
+        });
+        
+        window.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden' && googleScriptUrl) {
+                pushToGoogle();
+            }
+            if (document.visibilityState === 'visible' && googleScriptUrl) {
+                pullMergeFromGoogle(true); // обновить при возврате на вкладку
+            }
+        });
 
         function switchTab(tab) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
