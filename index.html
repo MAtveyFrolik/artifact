@@ -497,6 +497,7 @@
                 </div>
                 <button class="btn-primary" style="width: 100%; margin-bottom: 8px;" onclick="testSyncConnection()">🔗 Проверить подключение</button>
                 <button class="btn-secondary" style="width: 100%;" onclick="syncNow()">🔄 Синхронизировать сейчас</button>
+                <button onclick="pullFromGoogle()" style="background: rgba(255,255,255,0.2); color: white; padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-left: 8px;">⬇️ Скачать с Google</button>
             </div>
 
             <form id="syncForm" onsubmit="saveSyncSettings(event)">
@@ -757,6 +758,7 @@ function saveData(data) {
             }
             document.getElementById('syncStatusText').textContent = '⏳ Синхронизация...';
             const callbackName = 'syncPullCallback_' + Date.now();
+            
             window[callbackName] = function(response) {
                 try {
                     if (response.status === 'ok') {
@@ -766,23 +768,27 @@ function saveData(data) {
                         const googleSupplierIds = new Set(googleSuppliers.map(s => String(s.id)));
                         const myNewProducts = products.filter(p => !googleProductIds.has(String(p.id)));
                         const myNewSuppliers = suppliers.filter(s => !googleSupplierIds.has(String(s.id)));
+                        
                         products = [...googleProducts, ...myNewProducts];
                         suppliers = [...googleSuppliers, ...myNewSuppliers];
                         localStorage.setItem('products', JSON.stringify(products));
                         localStorage.setItem('suppliers', JSON.stringify(suppliers));
                         renderAll();
+                        
                         // Отправляем объединённые данные в Google
                         const data = { products, suppliers };
                         const formData = new FormData();
                         formData.append('data', JSON.stringify(data));
+                        
                         if (navigator.sendBeacon) {
                             navigator.sendBeacon(googleScriptUrl, formData);
                         } else {
                             fetch(googleScriptUrl, { method: 'POST', mode: 'no-cors', body: formData }).catch(()=>{});
                         }
+                        
                         document.getElementById('syncStatusText').textContent = '✅ Синхронизировано';
                         document.getElementById('syncStatus').textContent = '✅ Синхронизировано';
-                        alert('✅ Синхронизация завершена!');
+                        alert('✅ Синхронизация завершена!\nТоваров: ' + products.length);
                     } else {
                         alert('❌ Ошибка от Google: ' + response.message);
                     }
@@ -792,6 +798,7 @@ function saveData(data) {
                 if (script.parentNode) document.body.removeChild(script);
                 delete window[callbackName];
             };
+            
             const script = document.createElement('script');
             script.src = googleScriptUrl + '?action=getData&callback=' + callbackName;
             document.body.appendChild(script);
@@ -813,6 +820,47 @@ function saveData(data) {
         }
     }
 
+        function pullFromGoogle() {
+            if (!googleScriptUrl) {
+                alert('Сначала подключитесь в разделе "Синхронизация"');
+                return;
+            }
+            
+            const callbackName = 'pullCallback_' + Date.now();
+            window[callbackName] = function(response) {
+                if (response.status === 'ok') {
+                    const googleProducts = response.products || [];
+                    const googleSuppliers = response.suppliers || [];
+                    
+                    // Объединяем: данные из Google + наши локальные (которых нет в Google)
+                    const googleProductIds = new Set(googleProducts.map(p => String(p.id)));
+                    const googleSupplierIds = new Set(googleSuppliers.map(s => String(s.id)));
+                    
+                    const myNewProducts = products.filter(p => !googleProductIds.has(String(p.id)));
+                    const myNewSuppliers = suppliers.filter(s => !googleSupplierIds.has(String(s.id)));
+                    
+                    const totalProducts = [...googleProducts, ...myNewProducts];
+                    const totalSuppliers = [...googleSuppliers, ...myNewSuppliers];
+                    
+                    products = totalProducts;
+                    suppliers = totalSuppliers;
+                    
+                    localStorage.setItem('products', JSON.stringify(products));
+                    localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                    renderAll();
+                    
+                    alert(`✅ Скачано из Google:\n${googleProducts.length} товаров\n${googleSuppliers.length} поставщиков\n\nИтого на устройстве: ${products.length} товаров`);
+                } else {
+                    alert('❌ Ошибка: ' + response.message);
+                }
+                if (script.parentNode) document.body.removeChild(script);
+                delete window[callbackName];
+            };
+            
+            const script = document.createElement('script');
+            script.src = googleScriptUrl + '?action=getData&callback=' + callbackName;
+            document.body.appendChild(script);
+        }
 
         function loadDataFromGoogle() {
             if (!googleScriptUrl) return;
