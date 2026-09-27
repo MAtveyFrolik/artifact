@@ -764,10 +764,10 @@ function saveData(data) {
                     if (response.status === 'ok') {
                         const googleProducts = response.products || [];
                         const googleSuppliers = response.suppliers || [];
-                        const googleProductIds = new Set(googleProducts.map(p => String(p.id)));
-                        const googleSupplierIds = new Set(googleSuppliers.map(s => String(s.id)));
-                        const myNewProducts = products.filter(p => !googleProductIds.has(String(p.id)));
-                        const myNewSuppliers = suppliers.filter(s => !googleSupplierIds.has(String(s.id)));
+                        const gpIds = new Set(googleProducts.map(p => String(p.id)));
+                        const gsIds = new Set(googleSuppliers.map(s => String(s.id)));
+                        const myNewProducts = products.filter(p => !gpIds.has(String(p.id)));
+                        const myNewSuppliers = suppliers.filter(s => !gsIds.has(String(s.id)));
                         
                         products = [...googleProducts, ...myNewProducts];
                         suppliers = [...googleSuppliers, ...myNewSuppliers];
@@ -775,15 +775,12 @@ function saveData(data) {
                         localStorage.setItem('suppliers', JSON.stringify(suppliers));
                         renderAll();
                         
-                        // Отправляем объединённые данные в Google
-                        const data = { products, suppliers };
-                        const formData = new FormData();
-                        formData.append('data', JSON.stringify(data));
-                        
+                        // Отправляем объединённые данные
+                        const payload = JSON.stringify({ products, suppliers });
                         if (navigator.sendBeacon) {
-                            navigator.sendBeacon(googleScriptUrl, formData);
+                            navigator.sendBeacon(googleScriptUrl, payload);
                         } else {
-                            fetch(googleScriptUrl, { method: 'POST', mode: 'no-cors', body: formData }).catch(()=>{});
+                            fetch(googleScriptUrl, { method: 'POST', mode: 'no-cors', body: payload }).catch(()=>{});
                         }
                         
                         document.getElementById('syncStatusText').textContent = '✅ Синхронизировано';
@@ -859,17 +856,21 @@ function saveData(data) {
     }
     
     // ⬆️ Отправить в Google (без ожидания ответа)
-    function pushToGoogle() {
+   function pushToGoogle() {
         if (!googleScriptUrl || !navigator.onLine) return;
         
-        const data = { products, suppliers };
-        const formData = new FormData();
-        formData.append('data', JSON.stringify(data));
+        const payload = JSON.stringify({ products, suppliers });
         
         if (navigator.sendBeacon) {
-            navigator.sendBeacon(googleScriptUrl, formData);
+            // Отправляем СТРОКУ — sendBeacon пошлёт её как text/plain,
+            // а Google положит её в e.postData.contents (валидный JSON)
+            navigator.sendBeacon(googleScriptUrl, payload);
         } else {
-            fetch(googleScriptUrl, { method: 'POST', mode: 'no-cors', body: formData }).catch(()=>{});
+            fetch(googleScriptUrl, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: payload
+            }).catch(()=>{});
         }
         console.log('⬆️ Отправлено в Google');
     }
