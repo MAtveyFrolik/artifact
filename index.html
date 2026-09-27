@@ -752,60 +752,61 @@ function saveData(data) {
         }
 
         // ⬇️ Скачать из Google и объединить с локальными данными
-    function pullMergeFromGoogle(silent) {
-        if (!googleScriptUrl) return;
-        
-        const callbackName = 'pullMerge_' + Date.now();
-        window[callbackName] = function(response) {
-            if (response.status === 'ok') {
-                const googleProducts = response.products || [];
-                const googleSuppliers = response.suppliers || [];
-                
-                const gpIds = new Set(googleProducts.map(p => String(p.id)));
-                const gsIds = new Set(googleSuppliers.map(s => String(s.id)));
-                
-                const myNewProducts = products.filter(p => !gpIds.has(String(p.id)));
-                const myNewSuppliers = suppliers.filter(s => !gsIds.has(String(s.id)));
-                
-                const merged = {
-                    products: [...googleProducts, ...myNewProducts],
-                    suppliers: [...googleSuppliers, ...myNewSuppliers]
-                };
-                
-                // Проверяем, изменилось ли что-то
-                const changed = JSON.stringify(merged.products) !== JSON.stringify(products) ||
-                                JSON.stringify(merged.suppliers) !== JSON.stringify(suppliers);
-                
-                products = merged.products;
-                suppliers = merged.suppliers;
-                localStorage.setItem('products', JSON.stringify(products));
-                localStorage.setItem('suppliers', JSON.stringify(suppliers));
-                
-                if (changed) {
+        function pullMergeFromGoogle(silent) {
+            if (!googleScriptUrl) return;
+            
+            const callbackName = 'pullMerge_' + Date.now();
+            window[callbackName] = function(response) {
+                if (response.status === 'ok') {
+                    const googleProducts = response.products || [];
+                    const googleSuppliers = response.suppliers || [];
+                    
+                    // Список наших локально удалённых ID
+                    const deletedProducts = JSON.parse(localStorage.getItem('deletedProducts') || '[]');
+                    const deletedSuppliers = JSON.parse(localStorage.getItem('deletedSuppliers') || '[]');
+                    
+                    // Фильтруем товары, которые мы локально удалили
+                    const gpFiltered = googleProducts.filter(p => !deletedProducts.includes(String(p.id)));
+                    const gsFiltered = googleSuppliers.filter(s => !deletedSuppliers.includes(String(s.id)));
+                    
+                    const gpIds = new Set(gpFiltered.map(p => String(p.id)));
+                    const gsIds = new Set(gsFiltered.map(s => String(s.id)));
+                    
+                    const myNewProducts = products.filter(p => !gpIds.has(String(p.id)));
+                    const myNewSuppliers = suppliers.filter(s => !gsIds.has(String(s.id)));
+                    
+                    products = [...gpFiltered, ...myNewProducts];
+                    suppliers = [...gsFiltered, ...myNewSuppliers];
+                    
+                    localStorage.setItem('products', JSON.stringify(products));
+                    localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                    
                     renderAll();
-                    console.log('🔄 Данные обновлены из Google');
+                    console.log('🔄 Синхронизировано из Google (удалённых локально: ' + deletedProducts.length + ')');
                 }
-                
-                // Если у нас есть новые данные (которых нет в Google) — отправляем их
-                if (myNewProducts.length > 0 || myNewSuppliers.length > 0) {
-                    pushToGoogle();
-                }
-            }
-            if (script.parentNode) document.body.removeChild(script);
-            delete window[callbackName];
-        };
-        
-        const script = document.createElement('script');
-        script.src = googleScriptUrl + '?action=getData&callback=' + callbackName;
-        document.body.appendChild(script);
-    }
+                if (script.parentNode) document.body.removeChild(script);
+                delete window[callbackName];
+            };
+            
+            const script = document.createElement('script');
+            script.src = googleScriptUrl + '?action=getData&callback=' + callbackName;
+            document.body.appendChild(script);
+        }
     
     // ⬆️ Отправить в Google (без ожидания ответа)
            // ⬇️ Новая функция: отправляет данные через iframe-форму (обходит CORS)
         function pushToGoogle() {
             if (!googleScriptUrl || !navigator.onLine) return;
             
-            const payload = JSON.stringify({ products, suppliers });
+            const deletedProducts = JSON.parse(localStorage.getItem('deletedProducts') || '[]');
+            const deletedSuppliers = JSON.parse(localStorage.getItem('deletedSuppliers') || '[]');
+            
+            const payload = JSON.stringify({
+                products: products,
+                suppliers: suppliers,
+                deletedProducts: deletedProducts,
+                deletedSuppliers: deletedSuppliers
+            });
             
             const iframeName = 'gas_post_' + Date.now();
             const iframe = document.createElement('iframe');
@@ -828,7 +829,7 @@ function saveData(data) {
             document.body.appendChild(form);
             form.submit();
             
-            console.log('⬆️ Отправлено через iframe-форму, размер:', (payload.length/1024).toFixed(1), 'КБ');
+            console.log('⬆️ Отправлено, размер:', (payload.length/1024).toFixed(1), 'КБ, удалённых:', deletedProducts.length);
             
             setTimeout(() => {
                 if (form.parentNode) form.parentNode.removeChild(form);
@@ -1328,7 +1329,28 @@ function saveData(data) {
             if (confirm('Удалить товар?')) {
                 products = products.filter(p => p.id !== id);
                 localStorage.setItem('products', JSON.stringify(products));
+                
+                // Запоминаем ID удалённого
+                let deleted = JSON.parse(localStorage.getItem('deletedProducts') || '[]');
+                if (!deleted.includes(String(id))) deleted.push(String(id));
+                localStorage.setItem('deletedProducts', JSON.stringify(deleted));
+                
                 renderAll();
+                pushToGoogle(); // сразу отправляем изменения на сервер
+            }
+        }
+        
+        function deleteSupplier(id) {
+            if (confirm('Удалить поставщика?')) {
+                suppliers = suppliers.filter(s => s.id !== id);
+                localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                
+                let deleted = JSON.parse(localStorage.getItem('deletedSuppliers') || '[]');
+                if (!deleted.includes(String(id))) deleted.push(String(id));
+                localStorage.setItem('deletedSuppliers', JSON.stringify(deleted));
+                
+                renderAll();
+                pushToGoogle();
             }
         }
 
