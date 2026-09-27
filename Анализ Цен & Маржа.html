@@ -1,0 +1,1144 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Анализ Цен & Маржа</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #f9fafb;
+            --card: #ffffff;
+            --border: #e5e7eb;
+            --text: #1f2937;
+            --text-light: #6b7280;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            padding: 12px 16px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-light);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 650px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .image-upload {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .image-upload img {
+            max-width: 100%;
+            max-height: 180px;
+            margin-top: 15px;
+            border-radius: 6px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .table-wrapper {
+            background: var(--card);
+            border-radius: 12px;
+            overflow-x: auto;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            background: var(--bg);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-light);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+
+        tr:hover {
+            background: var(--bg);
+        }
+
+        .product-cell {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .product-img {
+            width: 50px;
+            height: 50px;
+            border-radius: 6px;
+            object-fit: cover;
+            background: var(--bg);
+            flex-shrink: 0;
+        }
+
+        .product-info h3 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 3px;
+        }
+
+        .product-info p {
+            font-size: 11px;
+            color: var(--text-light);
+        }
+
+        .price-list {
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .price-item {
+            margin-bottom: 4px;
+        }
+
+        .price-value {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .margin-good {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .margin-warning {
+            color: var(--warning);
+            font-weight: 600;
+        }
+
+        .margin-bad {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-small {
+            padding: 6px 10px;
+            font-size: 11px;
+            border: 1px solid var(--border);
+            background: var(--card);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-danger {
+            color: var(--danger);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-light);
+        }
+
+        .supplier-card {
+            background: var(--bg);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .supplier-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .supplier-info {
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .supplier-info div {
+            margin-bottom: 4px;
+        }
+
+        .call-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+
+            table {
+                min-width: 900px;
+            }
+
+            header {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .tabs {
+                gap: 0;
+            }
+
+            .tab-btn {
+                padding: 10px 12px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Анализ Цен & Маржа</h1>
+            <p>Сравнение цен поставщиков, конкурентов и расчет маржинальности</p>
+            <div style="margin-top: 15px;">
+                <button onclick="openSyncSettings()" style="background: rgba(255,255,255,0.2); color: white; padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">☁️ Синхронизация</button>
+                <span id="syncStatus" style="margin-left: 10px; font-size: 12px; opacity: 0.8;">Нет подключения</span>
+            </div>
+        </header>
+
+        <!-- ВКЛАДКИ -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('comparison')">📊 Сравнение цен</button>
+            <button class="tab-btn" onclick="switchTab('pricing')">💰 Мои цены & Маржа</button>
+            <button class="tab-btn" onclick="switchTab('suppliers')">🏢 Поставщики</button>
+        </div>
+
+        <!-- ВКЛАДКА 1: СРАВНЕНИЕ ЦЕН -->
+        <div id="comparison" class="tab-content active">
+            <div class="controls">
+                <button class="btn-primary" onclick="openProductModal()">➕ Новый товар</button>
+                <div class="search-box">
+                    <input type="text" id="searchComparison" placeholder="🔍 Поиск..." onkeyup="filterComparison()">
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Товар</th>
+                            <th>Поставщики</th>
+                            <th>Конкуренты</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="comparisonBody">
+                    </tbody>
+                </table>
+                <div id="emptyComparison" class="empty-state" style="display: none;">
+                    <h3>📦 Товаров нет</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- ВКЛАДКА 2: МОИ ЦЕНЫ & МАРЖА -->
+        <div id="pricing" class="tab-content">
+            <div class="controls">
+                <div class="search-box">
+                    <input type="text" id="searchPricing" placeholder="🔍 Поиск..." onkeyup="filterPricing()">
+                </div>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Товар</th>
+                            <th>Себестоимость</th>
+                            <th>Мин цена конк.</th>
+                            <th>Рекомендуемая цена</th>
+                            <th>Прибыль</th>
+                            <th>Маржа %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pricingBody">
+                    </tbody>
+                </table>
+                <div id="emptyPricing" class="empty-state" style="display: none;">
+                    <h3>📊 Данных нет</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- ВКЛАДКА 3: ПОСТАВЩИКИ -->
+        <div id="suppliers" class="tab-content">
+            <div class="controls">
+                <button class="btn-primary" onclick="openSupplierModal()">➕ Новый поставщик</button>
+                <div class="search-box">
+                    <input type="text" id="searchSuppliers" placeholder="🔍 Поиск..." onkeyup="filterSuppliers()">
+                </div>
+            </div>
+
+            <div id="suppliersContainer">
+            </div>
+            <div id="emptySuppliers" class="empty-state" style="display: none;">
+                <h3>🏢 Поставщиков нет</h3>
+            </div>
+        </div>
+    </div>
+
+    <!-- МОДАЛ СИНХРОНИЗАЦИИ -->
+    <div class="modal" id="syncModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>☁️ Синхронизация данных</h2>
+                <button class="close-btn" onclick="closeSyncModal()">✕</button>
+            </div>
+
+            <div style="background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <div style="font-size: 13px; margin-bottom: 10px;">
+                    <strong>Статус:</strong> <span id="syncStatusText">❌ Не подключено</span>
+                </div>
+                <button class="btn-primary" style="width: 100%; margin-bottom: 8px;" onclick="testSyncConnection()">🔗 Проверить подключение</button>
+                <button class="btn-secondary" style="width: 100%;" onclick="syncNow()">🔄 Синхронизировать сейчас</button>
+            </div>
+
+            <form id="syncForm" onsubmit="saveSyncSettings(event)">
+                <div class="form-group">
+                    <label>Google Apps Script URL *</label>
+                    <input type="url" id="scriptUrl" placeholder="https://script.google.com/macros/d/...">
+                </div>
+
+                <div style="background: var(--warning); background: rgba(245, 158, 11, 0.1); border-left: 4px solid var(--warning); padding: 12px; border-radius: 6px; margin-bottom: 15px; font-size: 12px;">
+                    <strong>⚠️ Первый раз?</strong><br>
+                    <button type="button" class="btn-secondary" style="width: 100%; margin-top: 8px; background: var(--warning); color: white; border: none; font-size: 12px;" onclick="showFullInstructions()">📖 Показать полную инструкцию</button>
+                </div>
+
+                <div id="instructionsBlock" style="display: none; background: var(--bg); padding: 15px; border-radius: 8px; margin-bottom: 15px; font-size: 12px; max-height: 400px; overflow-y: auto;">
+                    <h4 style="margin-bottom: 10px; color: var(--primary);">📋 ПОЛНАЯ ИНСТРУКЦИЯ (Шаг за шагом)</h4>
+                    
+                    <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 12px; border-left: 4px solid var(--success);">
+                        <strong style="font-size: 13px;">ШАГ 1️⃣: Создайте Google Таблицу</strong><br>
+                        1. Откройте <a href="https://sheets.google.com" target="_blank" style="color: var(--primary); font-weight: 600;">sheets.google.com</a><br>
+                        2. Нажмите <strong>"+ Создать"</strong> (слева)<br>
+                        3. Выберите <strong>"Таблица"</strong><br>
+                        4. Назовите её <strong>"Инвентарь"</strong> (или любое имя)<br>
+                        5. ✅ Таблица создана!
+                    </div>
+
+                    <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 12px; border-left: 4px solid var(--success);">
+                        <strong style="font-size: 13px;">ШАГ 2️⃣: Добавьте Google Apps Script</strong><br>
+                        1. В Google Таблице нажмите <strong>"Расширения"</strong> (в меню сверху)<br>
+                        2. Выберите <strong>"Apps Script"</strong><br>
+                        3. Откроется новое окно - это редактор скрипта<br>
+                        4. <strong>УДАЛИТЕ</strong> весь текст который там уже есть (Code.gs)<br>
+                        5. <strong>ВСТАВЬТЕ</strong> весь код ниже:<br>
+                    </div>
+
+                    <div style="background: #1f2937; color: #e5e7eb; padding: 10px; border-radius: 6px; margin-bottom: 12px; font-size: 10px; font-family: monospace; overflow-x: auto;">
+const SHEET_NAME = 'Products';
+const SUPPLIERS_SHEET = 'Suppliers';
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    saveData(data);
+    return ContentService.createTextOutput(JSON.stringify({status: 'ok'})).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({status: 'error', msg: err})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  if(e.parameter.action === 'test') {
+    return ContentService.createTextOutput(JSON.stringify({status: 'ok'})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function saveData(data) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const productsSheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+  const suppliersSheet = ss.getSheetByName(SUPPLIERS_SHEET) || ss.insertSheet(SUPPLIERS_SHEET);
+  
+  productsSheet.clear();
+  suppliersSheet.clear();
+  
+  productsSheet.appendRow(['ID', 'Name', 'Photo', 'Competitors', 'Dates']);
+  const products = data.products || [];
+  products.forEach(p => {
+    productsSheet.appendRow([p.id, p.name, p.photo, JSON.stringify(p.competitors), p.dateAdded]);
+  });
+  
+  suppliersSheet.appendRow(['ID', 'Name', 'Phone', 'Email', 'Website', 'Notes']);
+  const suppliers = data.suppliers || [];
+  suppliers.forEach(s => {
+    suppliersSheet.appendRow([s.id, s.name, s.phone, s.email, s.website, s.notes]);
+  });
+}
+                    </div>
+
+                    <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 12px; border-left: 4px solid var(--success);">
+                        <strong style="font-size: 13px;">ШАГ 3️⃣: Разверните скрипт</strong><br>
+                        1. В левом меню нажмите <strong>"⚙️ Развернуть"</strong><br>
+                        2. Выберите <strong>"Новое развертывание"</strong><br>
+                        3. Нажмите значок шестеренки <strong>⚙️</strong> в "Тип"<br>
+                        4. Выберите <strong>"Веб-приложение"</strong><br>
+                        5. Выберите:<br>
+                        &nbsp;&nbsp;- <strong>Выполнять как:</strong> Ваш Gmail (например: you@gmail.com)<br>
+                        &nbsp;&nbsp;- <strong>Кто имеет доступ:</strong> "Все"<br>
+                        6. Нажмите <strong>"Развернуть"</strong><br>
+                        7. Дождитесь сообщение об успехе
+                    </div>
+
+                    <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 12px; border-left: 4px solid var(--success);">
+                        <strong style="font-size: 13px;">ШАГ 4️⃣: Скопируйте URL</strong><br>
+                        1. После развертывания Google покажет окно<br>
+                        2. <strong>СКОПИРУЙТЕ</strong> ссылку (она начинается с https://script.google.com/...)<br>
+                        3. Нажмите кнопку копирования (или Ctrl+C)
+                    </div>
+
+                    <div style="background: white; padding: 12px; border-radius: 6px; border-left: 4px solid var(--success);">
+                        <strong style="font-size: 13px;">ШАГ 5️⃣: Вставьте URL в приложение</strong><br>
+                        1. Вернитесь в это приложение<br>
+                        2. <strong>ВСТАВЬТЕ</strong> скопированный URL в поле выше<br>
+                        3. Нажмите <strong>"💾 Сохранить"</strong><br>
+                        4. Нажмите <strong>"🔗 Проверить подключение"</strong><br>
+                        5. Если всё ок - будет ✅ Подключено!<br>
+                        6. Готово! 🎉
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn-primary" style="flex: 1; font-size: 13px;">💾 Сохранить URL</button>
+                    <button type="button" class="btn-secondary" style="flex: 1;" onclick="closeSyncModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛ ТОВАРА -->
+    <div class="modal" id="productModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Добавить товар</h2>
+                <button class="close-btn" onclick="closeProductModal()">✕</button>
+            </div>
+
+            <form id="productForm" onsubmit="saveProduct(event)">
+                <div class="form-group">
+                    <label>Название *</label>
+                    <input type="text" id="productName" required placeholder="Название товара">
+                </div>
+
+                <div class="form-group">
+                    <label>Фото</label>
+                    <div class="image-upload" onclick="document.getElementById('photoInput').click()">
+                        <span id="uploadText">Загрузить фото</span>
+                        <img id="photoPreview" style="display: none;">
+                    </div>
+                    <input type="file" id="photoInput" class="file-input" accept="image/*" onchange="loadPhoto()">
+                </div>
+
+                <h3 style="margin: 20px 0 10px; font-size: 14px;">💰 Поставщики</h3>
+                <div id="suppliersSection"></div>
+                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 15px;" onclick="addSupplierFieldToProduct()">+ Добавить поставщика</button>
+
+                <h3 style="margin: 20px 0 10px; font-size: 14px;">🏪 Конкуренты</h3>
+                <div id="competitorsSection"></div>
+                <button type="button" class="btn-secondary" style="width: 100%; margin-bottom: 15px;" onclick="addCompetitorField()">+ Добавить конкурента</button>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn-primary" style="flex: 1;">💾 Сохранить</button>
+                    <button type="button" class="btn-secondary" style="flex: 1;" onclick="closeProductModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- МОДАЛ ПОСТАВЩИКА -->
+    <div class="modal" id="supplierModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Добавить поставщика</h2>
+                <button class="close-btn" onclick="closeSupplierModal()">✕</button>
+            </div>
+
+            <form id="supplierForm" onsubmit="saveSupplier(event)">
+                <div class="form-group">
+                    <label>Название *</label>
+                    <input type="text" id="supplierName" required placeholder="ТКГ, Лора, Сыктовка...">
+                </div>
+
+                <div class="form-group">
+                    <label>Телефон</label>
+                    <input type="tel" id="supplierPhone" placeholder="+7 (999) 999-99-99">
+                </div>
+
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="supplierEmail" placeholder="email@example.com">
+                </div>
+
+                <div class="form-group">
+                    <label>Сайт/Telegram</label>
+                    <input type="url" id="supplierWebsite" placeholder="https://t.me/... или https://...">
+                </div>
+
+                <div class="form-group">
+                    <label>Примечания</label>
+                    <textarea id="supplierNotes" placeholder="Условия доставки, минимальный заказ..."></textarea>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="submit" class="btn-primary" style="flex: 1;">💾 Сохранить</button>
+                    <button type="button" class="btn-secondary" style="flex: 1;" onclick="closeSupplierModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let products = [];
+        let suppliers = [];
+        let editingProductId = null;
+        let googleScriptUrl = null;
+
+        // СИНХРОНИЗАЦИЯ
+        function openSyncSettings() {
+            googleScriptUrl = localStorage.getItem('googleScriptUrl');
+            if (googleScriptUrl) {
+                document.getElementById('scriptUrl').value = googleScriptUrl;
+                document.getElementById('syncStatusText').textContent = '✅ Подключено';
+            }
+            document.getElementById('syncModal').classList.add('active');
+        }
+
+        function closeSyncModal() {
+            document.getElementById('syncModal').classList.remove('active');
+        }
+
+        function showFullInstructions() {
+            document.getElementById('instructionsBlock').style.display = 
+                document.getElementById('instructionsBlock').style.display === 'none' ? 'block' : 'none';
+        }
+
+        function saveSyncSettings(e) {
+            e.preventDefault();
+            googleScriptUrl = document.getElementById('scriptUrl').value;
+            localStorage.setItem('googleScriptUrl', googleScriptUrl);
+            document.getElementById('syncStatusText').textContent = '✅ Сохранено';
+            setTimeout(() => closeSyncModal(), 800);
+        }
+
+        async function testSyncConnection() {
+            if (!googleScriptUrl) {
+                alert('Введите URL Google Apps Script!');
+                return;
+            }
+            try {
+                const response = await fetch(googleScriptUrl + '?action=test');
+                const result = await response.json();
+                if (result.status === 'ok') {
+                    alert('✅ Подключение успешно!');
+                    document.getElementById('syncStatusText').textContent = '✅ Подключено';
+                    document.getElementById('syncStatus').textContent = '✅ Подключено';
+                } else {
+                    alert('❌ Ошибка подключения');
+                }
+            } catch (e) {
+                alert('❌ Ошибка: ' + e.message);
+            }
+        }
+
+        async function syncNow() {
+            if (!googleScriptUrl) {
+                alert('Сначала подключитесь в разделе "Синхронизация"');
+                return;
+            }
+            try {
+                document.getElementById('syncStatusText').textContent = '⏳ Синхронизация...';
+                const data = { products, suppliers };
+                const response = await fetch(googleScriptUrl, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.status === 'ok') {
+                    alert('✅ Данные синхронизированы!');
+                    document.getElementById('syncStatusText').textContent = '✅ Синхронизировано';
+                    document.getElementById('syncStatus').textContent = '✅ Синхронизировано';
+                } else {
+                    alert('❌ Ошибка синхронизации');
+                }
+            } catch (e) {
+                alert('❌ Ошибка: ' + e.message);
+            }
+        }
+
+        async function autoSync() {
+            if (googleScriptUrl && navigator.onLine) {
+                try {
+                    const data = { products, suppliers };
+                    await fetch(googleScriptUrl, {
+                        method: 'POST',
+                        body: JSON.stringify(data)
+                    }).catch(() => {});
+                } catch (e) {}
+            }
+        }
+
+        function loadData() {
+            const savedProducts = localStorage.getItem('products');
+            const savedSuppliers = localStorage.getItem('suppliers');
+            googleScriptUrl = localStorage.getItem('googleScriptUrl');
+            
+            if (savedProducts) products = JSON.parse(savedProducts);
+            if (savedSuppliers) suppliers = JSON.parse(savedSuppliers);
+            
+            if (googleScriptUrl) {
+                document.getElementById('syncStatus').textContent = '✅ Подключено';
+            }
+            
+            renderAll();
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        // ТОВАРЫ
+        function openProductModal() {
+            editingProductId = null;
+            document.getElementById('productForm').reset();
+            document.getElementById('photoPreview').style.display = 'none';
+            document.getElementById('uploadText').style.display = 'block';
+            renderSupplierFieldsForProduct();
+            renderCompetitorFieldsForProduct();
+            document.getElementById('productModal').classList.add('active');
+        }
+
+        function closeProductModal() {
+            document.getElementById('productModal').classList.remove('active');
+        }
+
+        function loadPhoto() {
+            const file = document.getElementById('photoInput').files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const preview = document.getElementById('photoPreview');
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    document.getElementById('uploadText').style.display = 'none';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function renderSupplierFieldsForProduct() {
+            const section = document.getElementById('suppliersSection');
+            section.innerHTML = suppliers.length > 0 ? suppliers.map((s, idx) => `
+                <div class="form-group">
+                    <label>${s.name}</label>
+                    <input type="number" class="supplier-price-${idx}" placeholder="Цена" step="0.01">
+                </div>
+            `).join('') : '<p style="font-size: 12px; color: var(--text-light);">Сначала добавьте поставщиков в справочник</p>';
+        }
+
+        function renderCompetitorFieldsForProduct() {
+            const section = document.getElementById('competitorsSection');
+            section.innerHTML = `
+                <div class="form-group">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px;">
+                        <input type="text" class="competitor-name-0" placeholder="Название конкурента">
+                        <input type="number" class="competitor-price-0" placeholder="Цена" step="0.01">
+                        <input type="number" class="competitor-views-0" placeholder="Просмотры">
+                    </div>
+                </div>
+            `;
+        }
+
+        function addSupplierFieldToProduct() {
+            // Функция для добавления нового поля конкурента
+            alert('Добавьте поставщика сначала в разделе "Поставщики"');
+        }
+
+        function addCompetitorField() {
+            const section = document.getElementById('competitorsSection');
+            const count = section.querySelectorAll('.form-group').length;
+            const html = `
+                <div class="form-group">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; align-items: center;">
+                        <input type="text" class="competitor-name-${count}" placeholder="Конкурент">
+                        <input type="number" class="competitor-price-${count}" placeholder="Цена" step="0.01">
+                        <input type="number" class="competitor-views-${count}" placeholder="Просмотры">
+                        <button type="button" class="btn-small" onclick="this.parentElement.parentElement.remove()" style="color: var(--danger);">🗑️</button>
+                    </div>
+                </div>
+            `;
+            section.insertAdjacentHTML('beforeend', html);
+        }
+
+        function saveProduct(e) {
+            e.preventDefault();
+
+            const supplierPrices = {};
+            suppliers.forEach((s, idx) => {
+                const price = document.querySelector('.supplier-price-' + idx)?.value;
+                if (price) {
+                    supplierPrices[s.id] = parseFloat(price);
+                }
+            });
+
+            const competitors = [];
+            document.querySelectorAll('[class*="competitor-name-"]').forEach((input, idx) => {
+                const name = input.value;
+                const price = document.querySelector('.competitor-price-' + idx)?.value;
+                const views = document.querySelector('.competitor-views-' + idx)?.value;
+                if (name && price) {
+                    competitors.push({ name, price: parseFloat(price), views: parseInt(views) || 0 });
+                }
+            });
+
+            const product = {
+                id: editingProductId || Date.now(),
+                name: document.getElementById('productName').value,
+                photo: document.getElementById('photoPreview').src || '',
+                supplierPrices: supplierPrices,
+                competitors: competitors,
+                dateAdded: new Date().toLocaleDateString('ru-RU')
+            };
+
+            if (editingProductId) {
+                const index = products.findIndex(p => p.id === editingProductId);
+                products[index] = product;
+            } else {
+                products.push(product);
+            }
+
+            localStorage.setItem('products', JSON.stringify(products));
+            renderAll();
+            closeProductModal();
+            autoSync();
+        }
+
+        // ПОСТАВЩИКИ
+        function openSupplierModal() {
+            document.getElementById('supplierForm').reset();
+            document.getElementById('supplierModal').classList.add('active');
+        }
+
+        function closeSupplierModal() {
+            document.getElementById('supplierModal').classList.remove('active');
+        }
+
+        function saveSupplier(e) {
+            e.preventDefault();
+
+            const supplier = {
+                id: Date.now(),
+                name: document.getElementById('supplierName').value,
+                phone: document.getElementById('supplierPhone').value,
+                email: document.getElementById('supplierEmail').value,
+                website: document.getElementById('supplierWebsite').value,
+                notes: document.getElementById('supplierNotes').value
+            };
+
+            suppliers.push(supplier);
+            localStorage.setItem('suppliers', JSON.stringify(suppliers));
+            renderAll();
+            closeSupplierModal();
+            autoSync();
+        }
+
+        function deleteSupplier(id) {
+            if (confirm('Удалить поставщика?')) {
+                suppliers = suppliers.filter(s => s.id !== id);
+                localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                renderAll();
+            }
+        }
+
+        // РЕНДЕРИНГ
+        function renderAll() {
+            renderComparison();
+            renderPricing();
+            renderSuppliers();
+        }
+
+        function renderComparison() {
+            const tbody = document.getElementById('comparisonBody');
+            const empty = document.getElementById('emptyComparison');
+
+            if (products.length === 0) {
+                tbody.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+
+            tbody.innerHTML = products.map(p => `
+                <tr>
+                    <td>
+                        <div class="product-cell">
+                            ${p.photo ? `<img src="${p.photo}" class="product-img">` : '<div class="product-img"></div>'}
+                            <div class="product-info">
+                                <h3>${p.name}</h3>
+                                <p>${p.dateAdded}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="price-list">
+                            ${suppliers.map(s => {
+                                const price = p.supplierPrices[s.id];
+                                return `<div class="price-item"><strong>${s.name}:</strong> ${price ? '₽' + price.toFixed(2) : '—'}</div>`;
+                            }).join('')}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="price-list">
+                            ${p.competitors.map(c => `<div class="price-item"><strong>${c.name}:</strong> ₽${c.price.toFixed(2)} (👁️${c.views})</div>`).join('')}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <button class="btn-small" onclick="editProduct(${p.id})">✏️</button>
+                            <button class="btn-small btn-danger" onclick="deleteProduct(${p.id})">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPricing() {
+            const tbody = document.getElementById('pricingBody');
+            const empty = document.getElementById('emptyPricing');
+
+            if (products.length === 0) {
+                tbody.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+
+            tbody.innerHTML = products.map(p => {
+                const costs = Object.values(p.supplierPrices).filter(x => x);
+                const minCost = costs.length > 0 ? Math.min(...costs) : 0;
+                const minCompPrice = Math.min(...p.competitors.map(c => c.price));
+                const recommendedPrice = Math.min(minCost * 1.25, minCompPrice - 1);
+                const profit = recommendedPrice - minCost;
+                const margin = minCost > 0 ? ((profit / recommendedPrice) * 100).toFixed(1) : 0;
+                const marginClass = margin >= 25 ? 'margin-good' : margin >= 15 ? 'margin-warning' : 'margin-bad';
+
+                return `
+                    <tr>
+                        <td><strong>${p.name}</strong></td>
+                        <td>₽${minCost.toFixed(2)}</td>
+                        <td>₽${minCompPrice.toFixed(2)}</td>
+                        <td style="color: var(--success); font-weight: 600;">₽${recommendedPrice.toFixed(2)}</td>
+                        <td>₽${profit.toFixed(2)}</td>
+                        <td class="${marginClass}">${margin}%</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderSuppliers() {
+            const container = document.getElementById('suppliersContainer');
+            const empty = document.getElementById('emptySuppliers');
+
+            if (suppliers.length === 0) {
+                container.innerHTML = '';
+                empty.style.display = 'block';
+                return;
+            }
+
+            empty.style.display = 'none';
+
+            container.innerHTML = suppliers.map(s => `
+                <div class="supplier-card" id="supplier-${s.id}">
+                    <div class="supplier-name">${s.name}</div>
+                    <div class="supplier-info">
+                        ${s.phone ? `<div>📞 <a href="tel:${s.phone}" class="call-link">${s.phone}</a></div>` : ''}
+                        ${s.email ? `<div>📧 ${s.email}</div>` : ''}
+                        ${s.website ? `<div>🌐 <a href="${s.website}" target="_blank" class="call-link">Перейти</a></div>` : ''}
+                        ${s.notes ? `<div>📝 ${s.notes}</div>` : ''}
+                    </div>
+                    <button class="btn-small btn-danger" style="margin-top: 10px;" onclick="deleteSupplier(${s.id})">🗑️ Удалить</button>
+                </div>
+            `).join('');
+        }
+
+        function editProduct(id) {
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+
+            editingProductId = id;
+            document.getElementById('productName').value = product.name;
+            
+            if (product.photo) {
+                const preview = document.getElementById('photoPreview');
+                preview.src = product.photo;
+                preview.style.display = 'block';
+                document.getElementById('uploadText').style.display = 'none';
+            }
+
+            renderSupplierFieldsForProduct();
+            const competitorsSection = document.getElementById('competitorsSection');
+            competitorsSection.innerHTML = product.competitors.map((c, idx) => `
+                <div class="form-group">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; align-items: center;">
+                        <input type="text" class="competitor-name-${idx}" value="${c.name}">
+                        <input type="number" class="competitor-price-${idx}" value="${c.price}" step="0.01">
+                        <input type="number" class="competitor-views-${idx}" value="${c.views}">
+                        <button type="button" class="btn-small" onclick="this.parentElement.parentElement.remove()" style="color: var(--danger);">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+
+            suppliers.forEach((s, idx) => {
+                const input = document.querySelector('.supplier-price-' + idx);
+                if (input) input.value = product.supplierPrices[s.id] || '';
+            });
+
+            document.getElementById('productModal').classList.add('active');
+        }
+
+        function deleteProduct(id) {
+            if (confirm('Удалить товар?')) {
+                products = products.filter(p => p.id !== id);
+                localStorage.setItem('products', JSON.stringify(products));
+                renderAll();
+            }
+        }
+
+        function filterComparison() {
+            const term = document.getElementById('searchComparison').value.toLowerCase();
+            document.querySelectorAll('#comparisonBody tr').forEach(row => {
+                const name = row.querySelector('.product-info h3')?.textContent.toLowerCase();
+                row.style.display = name?.includes(term) ? '' : 'none';
+            });
+        }
+
+        function filterPricing() {
+            const term = document.getElementById('searchPricing').value.toLowerCase();
+            document.querySelectorAll('#pricingBody tr').forEach(row => {
+                const name = row.querySelector('strong')?.textContent.toLowerCase();
+                row.style.display = name?.includes(term) ? '' : 'none';
+            });
+        }
+
+        function filterSuppliers() {
+            const term = document.getElementById('searchSuppliers').value.toLowerCase();
+            document.querySelectorAll('.supplier-card').forEach(card => {
+                const name = card.querySelector('.supplier-name').textContent.toLowerCase();
+                card.style.display = name.includes(term) ? '' : 'none';
+            });
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
