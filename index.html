@@ -896,8 +896,8 @@ function saveData(data) {
             if (document.visibilityState === 'visible' && navigator.onLine && googleScriptUrl) {
                 pullMergeFromGoogle(true); // тихо, без алертов
             }
-        }, 30000); // каждые 30 секунд
-        console.log('🔄 Автосинхронизация запущена (30 сек)');
+        }, 60000); // каждые 30 секунд
+        console.log('🔄 Автосинхронизация запущена (60 сек)');
     }
 
         function pullFromGoogle() {
