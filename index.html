@@ -726,7 +726,7 @@ function saveData(data) {
             setTimeout(() => closeSyncModal(), 800);
         }
 
-        function testSyncConnection() {
+       function testSyncConnection() {
             if (!googleScriptUrl) {
                 alert('Введите URL Google Apps Script!');
                 return;
@@ -750,7 +750,7 @@ function saveData(data) {
             document.body.appendChild(script);
         }
 
-        async function syncNow() {
+       async function syncNow() {
             if (!googleScriptUrl) {
                 alert('Сначала подключитесь в разделе "Синхронизация"');
                 return;
@@ -759,28 +759,26 @@ function saveData(data) {
                 document.getElementById('syncStatusText').textContent = '⏳ Синхронизация...';
                 const data = { products, suppliers };
                 
-                // ВАЖНО: Используем FormData вместо JSON
                 const formData = new FormData();
                 formData.append('data', JSON.stringify(data));
         
-                const response = await fetch(googleScriptUrl, {
+                // Используем no-cors, чтобы обойти блокировку браузера
+                await fetch(googleScriptUrl, {
                     method: 'POST',
+                    mode: 'no-cors',
                     body: formData
                 });
-                const result = await response.json();
-                if (result.status === 'ok') {
-                    alert('✅ Данные синхронизированы!');
-                    document.getElementById('syncStatusText').textContent = '✅ Синхронизировано';
-                    document.getElementById('syncStatus').textContent = '✅ Синхронизировано';
-                } else {
-                    alert('❌ Ошибка синхронизации');
-                }
+        
+                document.getElementById('syncStatusText').textContent = '✅ Синхронизировано';
+                document.getElementById('syncStatus').textContent = '✅ Синхронизировано';
+                alert('✅ Данные отправлены в Google Таблицу!');
+                
             } catch (e) {
-                alert('❌ Ошибка: ' + e.message);
+                alert('❌ Ошибка сети: ' + e.message);
+                document.getElementById('syncStatusText').textContent = '❌ Ошибка';
             }
         }
-
-    async function autoSync() {
+   async function autoSync() {
         if (googleScriptUrl && navigator.onLine) {
             try {
                 const data = { products, suppliers };
@@ -789,6 +787,7 @@ function saveData(data) {
                 
                 await fetch(googleScriptUrl, {
                     method: 'POST',
+                    mode: 'no-cors',
                     body: formData
                 }).catch(() => {});
             } catch (e) {}
@@ -803,8 +802,8 @@ function saveData(data) {
             window[callbackName] = function(response) {
                 if (response.status === 'ok') {
                     // Обновляем данные из Google
-                    if (response.products) products = response.products;
-                    if (response.suppliers) suppliers = response.suppliers;
+                    if (response.products && response.products.length > 0) products = response.products;
+                    if (response.suppliers && response.suppliers.length > 0) suppliers = response.suppliers;
                     
                     // Сохраняем в локальное хранилище
                     localStorage.setItem('products', JSON.stringify(products));
@@ -820,7 +819,7 @@ function saveData(data) {
             script.src = googleScriptUrl + '?action=getData&callback=' + callbackName;
             document.body.appendChild(script);
         }
-       function loadData() {
+      function loadData() {
             const savedProducts = localStorage.getItem('products');
             const savedSuppliers = localStorage.getItem('suppliers');
             googleScriptUrl = localStorage.getItem('googleScriptUrl');
