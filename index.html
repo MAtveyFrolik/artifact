@@ -751,61 +751,6 @@ function saveData(data) {
             document.body.appendChild(script);
         }
 
-       function syncNow() {
-            if (!googleScriptUrl) {
-                alert('Сначала подключитесь в разделе "Синхронизация"');
-                return;
-            }
-            document.getElementById('syncStatusText').textContent = '⏳ Синхронизация...';
-            const callbackName = 'syncPullCallback_' + Date.now();
-            
-            window[callbackName] = function(response) {
-                try {
-                    if (response.status === 'ok') {
-                        const googleProducts = response.products || [];
-                        const googleSuppliers = response.suppliers || [];
-                        const gpIds = new Set(googleProducts.map(p => String(p.id)));
-                        const gsIds = new Set(googleSuppliers.map(s => String(s.id)));
-                        const myNewProducts = products.filter(p => !gpIds.has(String(p.id)));
-                        const myNewSuppliers = suppliers.filter(s => !gsIds.has(String(s.id)));
-                        
-                        products = [...googleProducts, ...myNewProducts];
-                        suppliers = [...googleSuppliers, ...myNewSuppliers];
-                        localStorage.setItem('products', JSON.stringify(products));
-                        localStorage.setItem('suppliers', JSON.stringify(suppliers));
-                        renderAll();
-                        
-                        // Отправляем объединённые данные
-                        const payload = JSON.stringify({ products, suppliers });
-                        if (navigator.sendBeacon) {
-                            navigator.sendBeacon(googleScriptUrl, payload);
-                        } else {
-                            fetch(googleScriptUrl, { method: 'POST', mode: 'no-cors', body: payload }).catch(()=>{});
-                        }
-                        
-                        document.getElementById('syncStatusText').textContent = '✅ Синхронизировано';
-                        document.getElementById('syncStatus').textContent = '✅ Синхронизировано';
-                        alert('✅ Синхронизация завершена!\nТоваров: ' + products.length);
-                    } else {
-                        alert('❌ Ошибка от Google: ' + response.message);
-                    }
-                } catch (e) {
-                    alert('❌ Ошибка: ' + e.message);
-                }
-                if (script.parentNode) document.body.removeChild(script);
-                delete window[callbackName];
-            };
-            
-            const script = document.createElement('script');
-            script.src = googleScriptUrl + '?action=getData&callback=' + callbackName;
-            document.body.appendChild(script);
-        }
-        
-   function autoSync() {
-        pushToGoogle(); // Отправляем сразу при любом сохранении
-    }
-
-
         // ⬇️ Скачать из Google и объединить с локальными данными
     function pullMergeFromGoogle(silent) {
         if (!googleScriptUrl) return;
@@ -856,25 +801,91 @@ function saveData(data) {
     }
     
     // ⬆️ Отправить в Google (без ожидания ответа)
-   function pushToGoogle() {
-        if (!googleScriptUrl || !navigator.onLine) return;
-        
-        const payload = JSON.stringify({ products, suppliers });
-        
-        if (navigator.sendBeacon) {
-            // Отправляем СТРОКУ — sendBeacon пошлёт её как text/plain,
-            // а Google положит её в e.postData.contents (валидный JSON)
-            navigator.sendBeacon(googleScriptUrl, payload);
-        } else {
-            fetch(googleScriptUrl, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: payload
-            }).catch(()=>{});
+           // ⬇️ Новая функция: отправляет данные через iframe-форму (обходит CORS)
+        function pushToGoogle() {
+            if (!googleScriptUrl || !navigator.onLine) return;
+            
+            const payload = JSON.stringify({ products, suppliers });
+            
+            const iframeName = 'gas_post_' + Date.now();
+            const iframe = document.createElement('iframe');
+            iframe.name = iframeName;
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = googleScriptUrl;
+            form.target = iframeName;
+            form.style.display = 'none';
+            
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'data';
+            input.value = payload;
+            form.appendChild(input);
+            
+            document.body.appendChild(form);
+            form.submit();
+            
+            console.log('⬆️ Отправлено через iframe-форму, размер:', (payload.length/1024).toFixed(1), 'КБ');
+            
+            setTimeout(() => {
+                if (form.parentNode) form.parentNode.removeChild(form);
+                if (iframe.parentNode) document.body.removeChild(iframe);
+            }, 10000);
         }
-        console.log('⬆️ Отправлено в Google');
-    }
-    
+
+        // ⬇️ Синхронизация: скачивает из Google, объединяет и отправляет обратно
+        function syncNow() {
+            if (!googleScriptUrl) {
+                alert('Сначала подключитесь в разделе "Синхронизация"');
+                return;
+            }
+            document.getElementById('syncStatusText').textContent = '⏳ Синхронизация...';
+            const callbackName = 'syncPullCallback_' + Date.now();
+            
+            window[callbackName] = function(response) {
+                try {
+                    if (response.status === 'ok') {
+                        const googleProducts = response.products || [];
+                        const googleSuppliers = response.suppliers || [];
+                        const gpIds = new Set(googleProducts.map(p => String(p.id)));
+                        const gsIds = new Set(googleSuppliers.map(s => String(s.id)));
+                        const myNewProducts = products.filter(p => !gpIds.has(String(p.id)));
+                        const myNewSuppliers = suppliers.filter(s => !gsIds.has(String(s.id)));
+                        
+                        products = [...googleProducts, ...myNewProducts];
+                        suppliers = [...googleSuppliers, ...myNewSuppliers];
+                        localStorage.setItem('products', JSON.stringify(products));
+                        localStorage.setItem('suppliers', JSON.stringify(suppliers));
+                        renderAll();
+                        
+                        // Отправляем через iframe-форму
+                        pushToGoogle();
+                        
+                        document.getElementById('syncStatusText').textContent = '✅ Синхронизировано';
+                        document.getElementById('syncStatus').textContent = '✅ Синхронизировано';
+                        alert('✅ Синхронизация завершена!\nТоваров: ' + products.length);
+                    } else {
+                        alert('❌ Ошибка от Google: ' + response.message);
+                    }
+                } catch (e) {
+                    alert('❌ Ошибка: ' + e.message);
+                }
+                if (script.parentNode) document.body.removeChild(script);
+                delete window[callbackName];
+            };
+            
+            const script = document.createElement('script');
+            script.src = googleScriptUrl + '?action=getData&callback=' + callbackName;
+            document.body.appendChild(script);
+        }
+
+        // ⬇️ Автосинхронизация — теперь просто вызывает pushToGoogle
+        function autoSync() {
+            pushToGoogle();
+        }
     // 🔄 Автосинхронизация каждые 30 секунд
     let autoSyncTimer = null;
     
